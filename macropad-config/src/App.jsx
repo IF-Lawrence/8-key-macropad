@@ -19,7 +19,7 @@ function App() {
   const [aliasInput, setAliasInput] = useState("");
   const [ledColor, setLedColor] = useState("#ffffff");
   const [ledBrightness, setLedBrightness] = useState(10);
-  const [enableAlias, setEnableAlias] = useState(false);
+  const [enableAlias, setEnableAlias] = useState(true);
 
   // Icon Generation State
   const [showIconGen, setShowIconGen] = useState(false);
@@ -163,7 +163,7 @@ function App() {
     }
 
     let toAdd = button;
-    if (button === "{shift}" || button === "{lock}") return;
+    if (button === "{lock}") return;
     if (macMode) {
       if (button === "{lgui}") toAdd = "{lgui}";
       if (button === "{lalt}") toAdd = "{lalt}";
@@ -281,6 +281,55 @@ function App() {
     setKeyPresets(prev => prev.map(p =>
       p.id === presetId ? { ...p, name: newName } : p
     ));
+  };
+
+  const exportKeyPresets = () => {
+    if (keyPresets.length === 0) {
+      return alert("No presets to export.");
+    }
+
+    const exportData = {
+      version: "1.0",
+      type: "key-presets",
+      presets: keyPresets,
+      exportedAt: new Date().toISOString()
+    };
+
+    const element = document.createElement("a");
+    const file = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    element.href = URL.createObjectURL(file);
+    element.download = `macropad-presets-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+  };
+
+  const importKeyPresets = (event) => {
+    const fileReader = new FileReader();
+    fileReader.readAsText(event.target.files[0], "UTF-8");
+    fileReader.onload = e => {
+      try {
+        const parsed = JSON.parse(e.target.result);
+
+        if (parsed.type !== "key-presets" || !Array.isArray(parsed.presets)) {
+          return alert("Invalid preset file format.");
+        }
+
+        // Merge with existing presets, avoiding duplicates by id
+        const existingIds = new Set(keyPresets.map(p => p.id));
+        const newPresets = parsed.presets.filter(p => !existingIds.has(p.id));
+
+        if (newPresets.length === 0) {
+          return alert("All presets in this file already exist.");
+        }
+
+        setKeyPresets(prev => [...prev, ...newPresets]);
+        alert(`Imported ${newPresets.length} preset(s)!`);
+      } catch (err) {
+        alert("Invalid preset file.");
+      }
+    };
+    event.target.value = ''; // Reset input
   };
 
   const applyPreset = (preset, targetKey = null) => {
@@ -546,10 +595,10 @@ function App() {
         </div>
       </header>
 
-      <div className="flex-1 grid grid-cols-12 gap-6">
+      <div className="flex-1 flex gap-6 p-6 pt-0">
 
         {/* Preset Library Sidebar (Collapsible) */}
-        <div className={`${showPresetLibrary ? 'col-span-3' : 'col-span-0'} transition-all duration-300 overflow-hidden`}>
+        <div className={`${showPresetLibrary ? 'w-64 flex-shrink-0' : 'w-0'} transition-all duration-300 overflow-hidden`}>
           {showPresetLibrary && (
             <div className="glass-panel p-4 h-full flex flex-col">
               <div className="flex justify-between items-center mb-4">
@@ -617,6 +666,27 @@ function App() {
               </div>
 
               <div className="mt-4 pt-4 border-t border-white/10">
+                <div className="flex gap-2 mb-3">
+                  <button
+                    onClick={exportKeyPresets}
+                    className="flex-1 text-[10px] px-2 py-1.5 rounded bg-slate-700 text-gray-300 hover:bg-slate-600 flex items-center justify-center gap-1"
+                  >
+                    <Download size={10} /> Export
+                  </button>
+                  <input
+                    type="file"
+                    id="presetLibraryImport"
+                    className="hidden"
+                    accept=".json"
+                    onChange={importKeyPresets}
+                  />
+                  <button
+                    onClick={() => document.getElementById('presetLibraryImport').click()}
+                    className="flex-1 text-[10px] px-2 py-1.5 rounded bg-slate-700 text-gray-300 hover:bg-slate-600 flex items-center justify-center gap-1"
+                  >
+                    <Upload size={10} /> Import
+                  </button>
+                </div>
                 <p className="text-[10px] text-gray-500 text-center">
                   💡 Drag presets onto keys to apply them
                 </p>
@@ -626,7 +696,7 @@ function App() {
         </div>
 
         {/* Left Sidebar: Profiles & Visualization */}
-        <div className={`${showPresetLibrary ? 'col-span-4' : 'col-span-4'} flex flex-col gap-6`}>
+        <div className="w-[420px] flex-shrink-0 flex flex-col gap-6">
           {/* Profile Selector */}
           <div className="glass-panel p-4">
             <div className="flex justify-between items-center mb-3">
@@ -787,7 +857,7 @@ function App() {
         </div>
 
         {/* Right Content: Editor */}
-        <div className={`${showPresetLibrary ? 'col-span-5' : 'col-span-8'} glass-panel p-6 flex flex-col transition-all duration-300`}>
+        <div className="flex-1 glass-panel p-6 flex flex-col overflow-hidden">
 
           {activeKey ? (
             <>
@@ -815,12 +885,12 @@ function App() {
 
               {/* Tabs / Sections */}
 
-              {/* 1. Key Map Section */}
-              <div className="mb-8">
+              {/* 1. Key Map Section - Input Only */}
+              <div className="mb-4">
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-blue-400">
                   <KeyboardIcon size={18} /> Key Mapping
                 </h3>
-                <div className="flex gap-2 mb-4">
+                <div className="flex gap-2">
                   <input
                     value={keyInput}
                     onChange={(e) => setKeyInput(e.target.value)}
@@ -840,20 +910,22 @@ function App() {
                   <button onClick={() => setKeyInput("")} className="px-4 rounded-lg bg-slate-800 hover:bg-red-500/20 text-red-400 border border-transparent hover:border-red-500/50">Clear</button>
                   <button onClick={saveKeyConfig} className="btn-primary min-w-[100px]">Save</button>
                 </div>
-
-                <div className="bg-slate-900/50 p-4 rounded-xl border border-white/5">
-                  <Keyboard
-                    layout={layout}
-                    display={display}
-                    onKeyPress={handleVirtualKeyPress}
-                    theme={"hg-theme-default dark-theme"}
-                  />
-                </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-6 items-start">
-                {/* 2. Script Section */}
-                <div className="bg-slate-800/30 p-4 rounded-xl border border-white/5 relative">
+              {/* 2. Virtual Keyboard */}
+              <div className="mb-4 bg-slate-900/50 p-4 rounded-xl border border-white/5">
+                <Keyboard
+                  layout={layout}
+                  display={display}
+                  onKeyPress={handleVirtualKeyPress}
+                  theme={"hg-theme-default dark-theme"}
+                />
+              </div>
+
+              {/* 3. Two Column Layout: Script+QuickAction | Alias */}
+              <div className="flex gap-4 items-start">
+                {/* Left Column: Script + Quick Action */}
+                <div className="flex-1 bg-slate-800/30 p-4 rounded-xl border border-white/5 relative">
                   <div className="flex justify-between items-center mb-3">
                     <h3 className="text-md font-semibold flex items-center gap-2 text-purple-400">
                       <FileCode size={16} /> Advanced Script
@@ -888,7 +960,7 @@ function App() {
                     value={scriptInput}
                     onChange={(e) => setScriptInput(e.target.value)}
                     placeholder="Enter macro script..."
-                    className="w-full h-32 bg-slate-900 border border-slate-700 rounded-lg p-3 text-sm font-mono mb-3 focus:outline-none focus:border-purple-500 text-white"
+                    className="w-full h-20 bg-slate-900 border border-slate-700 rounded-lg p-3 text-sm font-mono mb-3 focus:outline-none focus:border-purple-500 text-white"
                   />
 
                   <div className="flex gap-2 mb-3 flex-wrap">
@@ -905,12 +977,11 @@ function App() {
                   </div>
 
                   {/* Quick Actions: Open App */}
-                  <div className="mb-4 bg-slate-900/50 p-3 rounded border border-white/5">
+                  <div className="mb-3 bg-slate-900/50 p-3 rounded border border-white/5">
                     <div className="flex justify-between items-center mb-2">
                       <label className="text-xs text-gray-400 font-medium">⚡️ Quick Action: Launch App</label>
                       <button
                         onClick={() => {
-                          // Toggle settings visibility logic could be here, or use a details/summary
                           const el = document.getElementById('qa-settings');
                           el.classList.toggle('hidden');
                         }}
@@ -942,7 +1013,6 @@ function App() {
                         </p>
                       </div>
                     </div>
-
 
                     <div className="flex gap-2">
                       <input
@@ -981,16 +1051,14 @@ function App() {
                     </div>
                   </div>
 
-
-
                   <div className="flex justify-end gap-2">
                     <button onClick={() => saveScript(false)} className="text-xs px-3 py-1.5 rounded bg-red-500/10 text-red-400 hover:bg-red-500/20">Delete</button>
                     <button onClick={() => saveScript(true)} className="text-xs px-3 py-1.5 rounded bg-purple-600 text-white hover:bg-purple-500">Save Script</button>
                   </div>
                 </div>
 
-                {/* 3. Alias Section */}
-                <div className="bg-slate-800/30 p-4 rounded-xl border border-white/5">
+                {/* Right Column: Alias */}
+                <div className="w-80 flex-shrink-0 bg-slate-800/30 p-4 rounded-xl border border-white/5">
                   <label className="flex items-center gap-2 cursor-pointer mb-3">
                     <input
                       type="checkbox"
@@ -1004,7 +1072,7 @@ function App() {
                       className="w-4 h-4 accent-green-500"
                     />
                     <span className="text-md font-semibold flex items-center gap-2 text-green-400">
-                      <Type size={16} /> Configure Display Alias
+                      <Type size={16} /> Display Alias
                     </span>
                   </label>
 
@@ -1013,17 +1081,17 @@ function App() {
                       <input
                         value={aliasInput}
                         onChange={(e) => setAliasInput(e.target.value)}
-                        placeholder="Label on screen (e.g. 'Copy')"
+                        placeholder="Label (e.g. 'Copy')"
                         className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-sm mb-3 focus:outline-none focus:border-green-500 text-white"
                         autoFocus
                       />
-                      <div className="flex justify-end gap-2">
-                        <button onClick={() => { saveAlias(false); setEnableAlias(false); }} className="text-xs px-3 py-1.5 rounded bg-red-500/10 text-red-400 hover:bg-red-500/20">Delete from Device</button>
+                      <div className="flex flex-col gap-2">
                         <button onClick={() => saveAlias(true)} className="text-xs px-3 py-1.5 rounded bg-green-600 text-white hover:bg-green-500">Save Alias</button>
+                        <button onClick={() => { saveAlias(false); setEnableAlias(false); }} className="text-xs px-3 py-1.5 rounded bg-red-500/10 text-red-400 hover:bg-red-500/20">Delete</button>
                       </div>
                     </>
                   ) : (
-                    <p className="text-xs text-gray-500 italic">Check the box above to configure a display name for this key.</p>
+                    <p className="text-xs text-gray-500 italic">Check the box to set a display name.</p>
                   )}
                 </div>
               </div>

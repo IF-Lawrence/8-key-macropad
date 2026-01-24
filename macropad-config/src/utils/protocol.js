@@ -4,6 +4,7 @@
 export const replaceModifier = (input) => {
     let placed = input.replace(/{lctrl}/g, "\xe0");
     placed = placed.replace(/{lshift}/g, "\xe1");
+    placed = placed.replace(/{shift}/g, "\xe1");  // Alias for {lshift}
     placed = placed.replace(/{lalt}/g, "\xe2");
     placed = placed.replace(/{lgui}/g, "\xe3"); // Win/Cmd Left
     placed = placed.replace(/{rctrl}/g, "\xe4");
@@ -51,13 +52,13 @@ export const replaceModifier = (input) => {
 
 export const getModifierNum = (input) => {
     let modifierNum = 0;
-    // Note: The original code only checked for inclusion, so multiple of same modifier didn't count? 
+    // Note: The original code only checked for inclusion, so multiple of same modifier didn't count?
     // "input.includes" returns boolean.
     // We will stick to original logic: if present, count 1.
-    modifierNum += input.includes("{lctrl}") ? 1 : 0;
-    modifierNum += input.includes("{lshift}") ? 1 : 0;
-    modifierNum += input.includes("{lalt}") ? 1 : 0;
-    modifierNum += input.includes("{lgui}") ? 1 : 0;
+    modifierNum += (input.includes("{lctrl}") || input.includes("{ctrl}")) ? 1 : 0;
+    modifierNum += (input.includes("{lshift}") || input.includes("{shift}")) ? 1 : 0;
+    modifierNum += (input.includes("{lalt}") || input.includes("{alt}")) ? 1 : 0;
+    modifierNum += (input.includes("{lgui}") || input.includes("{gui}")) ? 1 : 0;
     modifierNum += input.includes("{rctrl}") ? 1 : 0;
     modifierNum += input.includes("{rshift}") ? 1 : 0;
     modifierNum += input.includes("{ralt}") ? 1 : 0;
